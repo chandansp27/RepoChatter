@@ -3,25 +3,32 @@ import utils
 import requests
 from dotenv import load_dotenv
 import config
-from utils import WHITE, GREEN, RESET_COLOR, model_name
+from utils import WHITE, GREEN, RESET_COLOR, MODEL_NAME
 import uuid
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
-from langchain.memory import ConversationSummaryMemory
-from langchain.chains import ConversationalRetrievalChain
+from langchain.chains import RetrievalQA
 import warnings
+import sys
 from langchain_core._api.deprecation import LangChainDeprecationWarning
 
+warnings.filterwarnings("ignore", message="Number of requested results .*")
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=LangChainDeprecationWarning)
 warnings.filterwarnings('ignore', category=UserWarning, module="langchain")
 
+# error handler
+def custom_warning_handler(*args, **kwargs):
+    pass
+warnings.showwarning = custom_warning_handler
+
+
 # get api token from .env (github API and OpenAI API)
 github_access_token = config.GITHUB_ACCESS_TOKEN
-openai_access_token = config.OPENAI_ACCESS_TOKEN
+os.environ["OPENAI_API_KEY"] = config.OPENAI_ACCESS_TOKEN
 
 # format the user url for API request
 def parseAndFormatURL(user_url):
@@ -62,11 +69,11 @@ def parseAndFormatURL(user_url):
     if username:
         if repository:
             if other_url:
-                return repo_contents_url.format(username=username, repository=repository, other_url=other_url)
+                return repo_contents_url.format(username=username, repository=repository, other_url=other_url), url_info if url_info else {}
             else:
-                return repo_base_url.format(username=username, repository=repository)
+                return repo_base_url.format(username=username, repository=repository), url_info if url_info else {}
         else:
-            return user_repos_url.format(username=username)
+            return user_repos_url.format(username=username), url_info if url_info else {}
     else:
         return None
 
@@ -82,7 +89,7 @@ def getRequest(api_url):
         return response.json()
     except requests.exceptions.RequestException as e:
         print('Error requesting data from GitHub API:', e)
-        return None
+        return None, None
 
 
 # downloads user metadata and files from the API request to a local folder
@@ -130,14 +137,25 @@ def downloadFiles(json_output, url, local_folder):
 # take in the URL from the user
 user_url = input('Enter repository/subfolder/file URL: ')
 
-api_url = parseAndFormatURL(str(user_url))
-json_output = getRequest(api_url)
-local_repo_folder = utils.local_repository_cache_folder
-repo_download_path = downloadFiles(json_output, api_url, local_repo_folder)
+api_url, info_dict = parseAndFormatURL(str(user_url)) # type: ignore
 
+if api_url:
+    json_output = getRequest(api_url)
+else:
+    raise Exception('Invalid URL, enter a valid URL link')
+local_repo_folder = utils.local_repository_cache_folder
+
+if json_output:
+    print('DOWNLOADING FILES')
+    repo_download_path = downloadFiles(json_output, api_url, local_repo_folder)
+else:
+    raise Exception('Local Files download failed')
+
+# load downloaded files using Langchain
 def loadDocuments(repo_download_path):
     documents_dict = {}
-    loader = DirectoryLoader(repo_download_path, use_multithreading=True, show_progress=True)
+    files_info = []
+    loader = DirectoryLoader(repo_download_path, use_multithreading=True, show_progress=False)
     try:
         loaded_documents = loader.load() if callable(loader.load) else []
         if loaded_documents:
@@ -150,7 +168,7 @@ def loadDocuments(repo_download_path):
                 documents_dict[file_id] = doc
     except Exception as e:
         raise Exception('Document loading failed')
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 3000, chunk_overlap = 2000)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 3000, chunk_overlap = 300)
     split_documents = []
     for file_id, original_doc in documents_dict.items():
         split_docs = text_splitter.split_documents([original_doc])
@@ -158,10 +176,23 @@ def loadDocuments(repo_download_path):
             split_doc.metadata['file_id'] = original_doc.metadata['file_id']
             split_doc.metadata['source'] = original_doc.metadata['source']
         split_documents.extend(split_docs)
-    return split_documents if split_documents else None
+    return split_documents if split_documents else None, files_info if files_info else None
+
+def delete_files_in_folder(folder_path):
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            os.remove(file_path)
 
 if repo_download_path:
-    loaded_documents = loadDocuments(repo_download_path)
+    print('LOADING FILES')
+    loaded_documents, files_info = loadDocuments(repo_download_path)
+else:
+    raise Exception('Loading files into Langchain Failed')
+
+username_info = info_dict['username'] if info_dict['username'] else None # type: ignore
+repository_info = info_dict['repository'] if info_dict['repository'] else None # type: ignore
+idx_limit = len(loaded_documents) # type: ignore
 
 embeddings_dir = utils.embeddings_directory
 embeddings_path = os.path.join(os.getcwd(), embeddings_dir)
@@ -169,9 +200,24 @@ if not os.path.exists(embeddings_path):
     os.makedirs(embeddings_path)
 embeddings = OpenAIEmbeddings(disallowed_special=())
 vectordb = Chroma.from_documents(loaded_documents, embedding=embeddings, persist_directory=embeddings_path)
-llm = ChatOpenAI(model='gpt-3.5-turbo')
-memory = ConversationSummaryMemory(llm=llm, memory_key='chat_history', return_messages=True)
-question_answer = ConversationalRetrievalChain.from_llm(llm, retriever=vectordb.as_retriever(search_type='mmr', search_kwards={'k':1}), memory=memory)
+query = f'{username_info},{repository_info},{files_info}'
+retriever = vectordb.as_retriever()
+
+# supressing a warning, related to a bug in the current version of langchain
+# Redirect stdout and stderr to suppress all output including warnings
+sys.stdout = open(os.devnull, 'w')
+sys.stderr = open(os.devnull, 'w')
+
+relevant_chunks = retriever.get_relevant_documents(query ,search_kwargs={'k':1})
+
+# Restore stdout and stderr to default
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+
+qa_chain = RetrievalQA.from_chain_type(ChatOpenAI(temperature=0.2,model_name=MODEL_NAME), # type: ignore
+                                        chain_type="stuff",
+                                        retriever=retriever,
+                                        return_source_documents=True)
 
 def chat_loop():
     while True:
@@ -179,8 +225,8 @@ def chat_loop():
         if question.lower().strip() == 'exit()':
             break
         print(WHITE + 'Thinking...' + RESET_COLOR)
-        result = question_answer(question)
-        print(GREEN + "\nAnswer: " + result['answer'] + RESET_COLOR)
+        result = qa_chain(question)
+        print(GREEN + "\nAnswer: " + result['result'] + RESET_COLOR)
     vectordb.delete_collection()
-
+    delete_files_in_folder(local_repo_folder)
 chat_loop()
