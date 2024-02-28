@@ -229,3 +229,4 @@ def chat_loop():
     vectordb.delete_collection()
     delete_files_in_folder(local_repo_folder)
 chat_loop()
+
