@@ -1,7 +1,6 @@
 import os
 import utils
 import requests
-from dotenv import load_dotenv
 import config
 from utils import WHITE, GREEN, RESET_COLOR, MODEL_NAME
 import uuid
