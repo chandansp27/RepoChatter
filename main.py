@@ -88,7 +88,7 @@ def getRequest(api_url):
         return response.json()
     except requests.exceptions.RequestException as e:
         print('Error requesting data from GitHub API:', e)
-        return None, None
+        return None
 
 
 # downloads user metadata and files from the API request to a local folder
@@ -163,6 +163,7 @@ def loadDocuments(repo_download_path):
                 relative_path = os.path.relpath(file_path, repo_download_path)
                 file_id = str(uuid.uuid4())
                 doc.metadata['source'] = relative_path
+                files_info.append(relative_path)
                 doc.metadata['file_id'] = file_id
                 documents_dict[file_id] = doc
     except Exception as e:
@@ -175,9 +176,9 @@ def loadDocuments(repo_download_path):
             split_doc.metadata['file_id'] = original_doc.metadata['file_id']
             split_doc.metadata['source'] = original_doc.metadata['source']
         split_documents.extend(split_docs)
-    return split_documents if split_documents else None, files_info if files_info else None
+    return split_documents if split_documents else None, files_info
 
-def delete_files_in_folder(folder_path):
+def deleteFilesInFolder(folder_path):
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             file_path = os.path.join(root, file)
@@ -189,9 +190,8 @@ if repo_download_path:
 else:
     raise Exception('Loading files into Langchain Failed')
 
-username_info = info_dict['username'] if info_dict['username'] else None # type: ignore
-repository_info = info_dict['repository'] if info_dict['repository'] else None # type: ignore
-idx_limit = len(loaded_documents) # type: ignore
+username_info = info_dict['username'] if info_dict['username'] else '' # type: ignore
+repository_info = info_dict['repository'] if info_dict['repository'] else '' # type: ignore
 
 embeddings_dir = utils.embeddings_directory
 embeddings_path = os.path.join(os.getcwd(), embeddings_dir)
@@ -199,9 +199,8 @@ if not os.path.exists(embeddings_path):
     os.makedirs(embeddings_path)
 embeddings = OpenAIEmbeddings(disallowed_special=())
 vectordb = Chroma.from_documents(loaded_documents, embedding=embeddings, persist_directory=embeddings_path)
-query = f'{username_info},{repository_info},{files_info}'
 retriever = vectordb.as_retriever()
-
+query = f'username{username_info}, repository{repository_info}, answer the user as accurately'
 # supressing a warning, related to a bug in the current version of langchain
 # Redirect stdout and stderr to suppress all output including warnings
 sys.stdout = open(os.devnull, 'w')
@@ -218,15 +217,23 @@ qa_chain = RetrievalQA.from_chain_type(ChatOpenAI(temperature=0.2,model_name=MOD
                                         retriever=retriever,
                                         return_source_documents=True)
 
+username_info = info_dict['username'] if info_dict['username'] else '' # type: ignore
+repository_info = info_dict['repository'] if info_dict['repository'] else '' # type: ignore
+
+context = f"""You don't have the ability to directly access external repositories or files. However, based on the code provided,
+                context= username:{username_info}, repository:{repository_info}, files:{' '.join(files_info)},
+                you dont have to mention that you dont have external access."""
+
 def chat_loop():
     while True:
         question = input("\n" + WHITE + "Ask a question (or type 'exit()' to quit): " + RESET_COLOR)
         if question.lower().strip() == 'exit()':
             break
         print(WHITE + 'Thinking...' + RESET_COLOR)
+        question = context + question
         result = qa_chain(question)
         print(GREEN + "\nAnswer: " + result['result'] + RESET_COLOR)
+        question +=  f'previous:{question}, prevoius answer:{result}'
     vectordb.delete_collection()
-    delete_files_in_folder(local_repo_folder)
+    deleteFilesInFolder(local_repo_folder)
 chat_loop()
-
