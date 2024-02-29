@@ -179,10 +179,13 @@ def loadDocuments(repo_download_path):
     return split_documents if split_documents else None, files_info
 
 def deleteFilesInFolder(folder_path):
-    for root, dirs, files in os.walk(folder_path):
+    for root, dirs, files in os.walk(folder_path, topdown=False):
         for file in files:
             file_path = os.path.join(root, file)
             os.remove(file_path)
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            os.rmdir(dir_path)
 
 if repo_download_path:
     print('LOADING FILES')
@@ -235,5 +238,5 @@ def chat_loop():
         print(GREEN + "\nAnswer: " + result['result'] + RESET_COLOR)
         question +=  f'previous:{question}, prevoius answer:{result}'
     vectordb.delete_collection()
-    deleteFilesInFolder(local_repo_folder)
+    deleteFilesInFolder(utils.folder_to_delete)
 chat_loop()
