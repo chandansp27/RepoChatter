@@ -21,8 +21,8 @@
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
-            width: 70%; /* Increased width */
-            max-width: 1000px; /* Increased maximum width */
+            width: 70%; 
+            max-width: 1000px; 
             margin: 20px;
             flex: 1;
             display: flex;
@@ -76,7 +76,6 @@
 
 <div class="chat-container">
     <div class="chat-window" id="chatWindow">
-        <!-- Chat messages will be dynamically inserted here -->
     </div>
     <input type="text" id="chatInput" class="chat-input" placeholder="{{ default_message }}">
     <div>
@@ -91,12 +90,11 @@
         const chatWindow = document.getElementById('chatWindow');
 
         const userMessage = inputField.value.trim();
-        const userUrl = "github_url"; // Replace with a method to get the original GitHub URL if needed
+        const userUrl = "github_url"; 
         if (!userMessage) return;
 
-    // Append the user's message to the chat
     let userDiv = document.createElement('div');
-    userDiv.textContent = "USER: " + userMessage; // Add "USER: " before the user's message;
+    userDiv.textContent = "USER: " + userMessage; 
     userDiv.className = 'message user';
     chatWindow.appendChild(userDiv);
 
@@ -112,7 +110,7 @@
             }), 
         });
         const data = await response.json();
-        let aiMessage = "AI: " + data.message; // Assuming the response has a 'message' key
+        let aiMessage = "AI: " + data.message; 
 
         let aiDiv = document.createElement('div');
         aiDiv.textContent = aiMessage;
@@ -123,18 +121,17 @@
         console.error("Error:", error);
         let errorDiv = document.createElement('div');
         errorDiv.textContent = "Error communicating with the AI";
-        errorDiv.className = 'message error'; // Make sure to define a 'message error' CSS
+        errorDiv.className = 'message error';
         chatWindow.appendChild(errorDiv);
     }
 
     inputField.value = '';  // Clear input
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    // Correct: Attach 'keypress' event listener outside the submitMessage function
     document.getElementById('chatInput').addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
-        e.preventDefault(); // Prevent the default action to stop submitting the form
-        submitMessage(); // Call your message submit function
+        e.preventDefault();
+        submitMessage();
         }
     });
 }
