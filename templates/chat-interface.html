@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+        .chat-container {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 70%; /* Increased width */
+            max-width: 1000px; /* Increased maximum width */
+            margin: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-window {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .chat-input {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .submit-btn {
+            background-color: #007bff;
+            color: white;
+        }
+        .exit-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .message.user {
+            color: black; /* User message color */
+        }
+        .message.ai {
+            color: green; /* AI message color */
+        }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-window" id="chatWindow">
+        <!-- Chat messages will be dynamically inserted here -->
+    </div>
+    <input type="text" id="chatInput" class="chat-input" placeholder="{{ default_message }}">
+    <div>
+        <button class="submit-btn" onclick="submitMessage()">Send</button>
+        <button class="exit-btn" onclick="window.location.href='/'">Exit</button>
+    </div>
+</div>
+<script>
+    var githubUrl = "{{ github_url }}";
+    async function submitMessage() {
+        const inputField = document.getElementById('chatInput');
+        const chatWindow = document.getElementById('chatWindow');
+
+        const userMessage = inputField.value.trim();
+        const userUrl = "github_url"; // Replace with a method to get the original GitHub URL if needed
+        if (!userMessage) return;
+
+    // Append the user's message to the chat
+    let userDiv = document.createElement('div');
+    userDiv.textContent = "USER: " + userMessage; // Add "USER: " before the user's message;
+    userDiv.className = 'message user';
+    chatWindow.appendChild(userDiv);
+
+    try {
+        const response = await fetch('/process_chat_query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                user_question: userMessage,
+                github_url: githubUrl 
+            }), 
+        });
+        const data = await response.json();
+        let aiMessage = "AI: " + data.message; // Assuming the response has a 'message' key
+
+        let aiDiv = document.createElement('div');
+        aiDiv.textContent = aiMessage;
+        aiDiv.className = 'message ai';
+        chatWindow.appendChild(aiDiv);
+
+    } catch (error) {
+        console.error("Error:", error);
+        let errorDiv = document.createElement('div');
+        errorDiv.textContent = "Error communicating with the AI";
+        errorDiv.className = 'message error'; // Make sure to define a 'message error' CSS
+        chatWindow.appendChild(errorDiv);
+    }
+
+    inputField.value = '';  // Clear input
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    // Correct: Attach 'keypress' event listener outside the submitMessage function
+    document.getElementById('chatInput').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent the default action to stop submitting the form
+        submitMessage(); // Call your message submit function
+        }
+    });
+}
+</script>
+
+</body>
+</html>
