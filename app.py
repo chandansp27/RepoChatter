@@ -10,8 +10,6 @@ from langchain.chains import RetrievalQA
 
 app = Flask(__name__)
 
-app.secret_key = '1234567' 
-
 @app.route("/")
 def hello():
     return render_template('index.html')
