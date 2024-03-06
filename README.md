@@ -1,4 +1,4 @@
-** Github Repository Interpreter ** 
+## GitHub Repository Interpreter 
 
 "Chat with any GitHub codebase / own code"
 
