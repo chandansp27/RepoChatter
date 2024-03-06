@@ -8,6 +8,13 @@
 - Using a query retrieve the top k chunks, and feed it to an LLM, here in my code I'm using OpenAI GPT 3.5 turbo
 - Chat with the files : )
 
+#### Flask Application
+![Screenshot 2024-03-06 180723](https://github.com/chandansp27/RepositoryInterpreter/assets/72791595/c976c700-ee67-41fa-a36a-23897dd94b64)
+
+![Screenshot 2024-03-06 180842](https://github.com/chandansp27/RepositoryInterpreter/assets/72791595/c31c013f-ef46-4051-ad49-69075ff97885)
+
+![Screenshot 2024-03-06 184200](https://github.com/chandansp27/RepositoryInterpreter/assets/72791595/958f1e1c-4a42-429b-b00c-b1548dde696a)
+
   Improvements pending:
     - Will try to use "git sparse-checkout" to get the files faster
     - Provide chat summary and metadata to the LLM
