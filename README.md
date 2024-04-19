@@ -1,5 +1,4 @@
-## GitHub Repository Interpreter 
-
+## GitHub Repository ChatBot
 "Chat with any GitHub codebase / own code"
 
 - Enter a valid URL of a repository, subfolder, or even a file
