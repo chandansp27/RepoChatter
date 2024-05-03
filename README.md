@@ -25,4 +25,4 @@
   Improvements pending:
     - Will try to use "git sparse-checkout" to get the files faster
     - Provide chat summary and metadata to the LLM
-    - Provide usage of open-source LLMs and OLLAMA
+    - Provide usage of open-source LLMs HuggingFace API and Ollama
